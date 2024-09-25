@@ -1,0 +1,4 @@
+../Core/Src/syouki.c:9:7:syouki_map	1
+../Core/Src/syouki.c:13:6:syouki_CAN_Write	3
+../Core/Src/syouki.c:38:6:syouki_printf_Init	1
+../Core/Src/syouki.c:42:6:syouki_omni_calculation	5
