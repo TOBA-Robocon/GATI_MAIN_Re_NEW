@@ -103,8 +103,8 @@ uint32_t fId4 = 0x000 << 5; // フィルターID4
 
 //スティックのデッドゾーン
 #define HAJIKU 35
-#define MAX 200
-#define MIN -200
+#define MAX 250
+#define MIN -250
 
 //足回りの正面変更
 float root = 0.7071;
@@ -204,6 +204,46 @@ int main(void) {
 		HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, RESET);
 		HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, RESET);
 
+//		サーボモーターの角度指定
+//		〇ボタン
+		if (DualShock_data[1][6]) {
+			servo_angle = 0;
+		} else {
+			servo_angle = 20;
+		}
+
+		if (DualShock_data[1][5]) {
+
+		}
+//      発射機構正面手動ver(リミットスイッチによる制限付き)
+//		十字キー上ボタン
+		if (DualShock_data[1][2]) {
+//		    前のリミットスイッチ
+			if (FilingMechanism_data[0][1]) {
+				s_power = 0;
+				direction = 1;
+			} else {
+				s_power = 175;
+				direction = 1;
+			}
+		}
+//		十字キー下ボタン
+		else if (DualShock_data[1][4]) {
+//			後ろのリミットスイッチ
+			if (FilingMechanism_data[0][2]) {
+				s_power = 0;
+				direction = 0;
+			} else {
+				s_power = 175;
+				direction = 0;
+			}
+		}
+//		想定していない状態なら止める
+		else {
+			s_power = 0;
+			direction = 0;
+		}
+
 //		旋回:Y:X方向の出力の計算
 //		Lスティック
 		turning = DualShock_data[2][5] - DualShock_data[2][6];
@@ -236,44 +276,7 @@ int main(void) {
 		bl_state = all_state(bl_power);
 		br_state = all_state(br_power);
 
-//		サーボモーターの角度指定
-//		〇ボタン
-		if (DualShock_data[1][6]) {
-			servo_angle = 0;
-		} else {
-			servo_angle = 20;
-		}
-
-//      発射機構手動ver(リミットスイッチによる制限付き)
-//		上ボタン
-		if (DualShock_data[1][2]) {
-//		    前のリミットスイッチ
-			if (FilingMechanism_data[0][1]) {
-				s_power = 0;
-				direction = 1;
-			} else {
-				s_power = 175;
-				direction = 1;
-			}
-		}
-//		下ボタン
-		else if (DualShock_data[1][4]) {
-//			後ろのリミットスイッチ
-			if (FilingMechanism_data[0][2]) {
-				s_power = 0;
-				direction = 0;
-			} else {
-				s_power = 175;
-				direction = 0;
-			}
-		}
-//		想定していない状態なら止める
-		else {
-			s_power = 0;
-			direction = 0;
-		}
-
-		//can_TX
+//      can_TX
 		CAN_TX(AB_ID, abs(fl_power), fl_state, abs(fr_power), fr_state, 0);
 		CAN_TX(CD_ID, abs(bl_power), bl_state, abs(br_power), br_state, 0);
 		CAN_TX(FIRING_ID, 0, 0, s_power, direction, servo_angle);
