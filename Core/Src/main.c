@@ -93,7 +93,15 @@ static void MX_I2C1_Init(void);
 //can_ID
 #define AB_ID 0x003
 #define CD_ID 0x004
-#define FIRING_ID 0x005
+
+//発射機構前
+#define FFIRING_ID 0x005
+
+//発射機構後ろ
+//#define BFIRING_ID 0x006
+
+//グライダー
+//#define GFIRING_ID 0x007
 
 //receive_ID
 uint32_t fId1 = 0x000 << 5; // フィルターID1
@@ -102,7 +110,7 @@ uint32_t fId3 = 0x200 << 5; // フィルターID3
 uint32_t fId4 = 0x000 << 5; // フィルターID4
 
 //スティックのデッドゾーン
-#define HAJIKU 35
+#define HAJIKU 50
 #define MAX 250
 #define MIN -250
 
@@ -133,14 +141,20 @@ int fl_power, fr_power, bl_power, br_power;
 int vx, vy;
 int new_vx, new_vy;
 
-//サーボの角度指定
-int servo_angle = 0;
+//前のサーボの角度指定
+int Fservo_angle = 0;
+
+//後ろのサーボの角度指定
+//int Bservo_angle = 0;
 
 //PS4からのデータ受け取り用配列
 uint8_t DualShock_data[3][8] = { 0 };
 
 //発射用ばねハブからのデータ送受信用
 uint8_t FilingMechanism_data[3][8] = { 0 };
+
+//電源基盤受信用
+uint8_t Electrical_data[8] = { 0 };
 
 //map関数
 long map(long x, long in_min, long in_max, long out_min, long out_max) {
@@ -198,27 +212,100 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
+
+		printf("main..%d  ", Electrical_data[0]);
+		printf("sub..%d\r\n", Electrical_data[1]);
 //      動作確認用LED
 		HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, RESET);
 		HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, RESET);
 		HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, RESET);
 		HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, RESET);
 
+//		旋回:Y:X方向の出力の計算
+//		Lスティック
+		turning = DualShock_data[2][5] - DualShock_data[2][6];
+		vy = DualShock_data[0][1] - DualShock_data[0][2];
+		vx = DualShock_data[0][3] - DualShock_data[0][4];
+
+//		Y:X方向の値の最低:最大値変更
+		vy = map(vy, -128, 128, -255, 255);
+		vx = map(vx, -128, 128, -255, 255);
+
+//		正面の向きを45度変更
+		new_vx = root * (vx + vy);
+		new_vy = root * (-vx + vy);
+
+//		それぞれのオムニの出力の計算
+		fl_power = -new_vx - new_vy - turning;
+		fr_power = new_vx - new_vy + turning;
+		bl_power = -new_vx + new_vy + turning;
+		br_power = new_vx + new_vy - turning;
+
+		if (DualShock_data[1][3]) {
+			fl_power = 0;
+			fr_power = 250;
+			bl_power = -250;
+			br_power = 0;
+		} else if (DualShock_data[1][5]) {
+			fl_power = 0;
+			fr_power = -250;
+			bl_power = 250;
+			br_power = 0;
+		} else {
+			fl_power = -new_vx - new_vy - turning;
+			fr_power = new_vx - new_vy + turning;
+			bl_power = -new_vx + new_vy + turning;
+			br_power = new_vx + new_vy - turning;
+		}
+
+//		値を弾く
+		fl_power = flip(fl_power);
+		fr_power = flip(fr_power);
+		bl_power = flip(bl_power);
+		br_power = flip(br_power);
+
+//		値からモーターの方向指定
+		fl_state = all_state(fl_power);
+		fr_state = all_state(fr_power);
+		bl_state = all_state(bl_power);
+		br_state = all_state(br_power);
+
 //		サーボモーターの角度指定
 //		〇ボタン
 		if (DualShock_data[1][6]) {
-			servo_angle = 0;
+			Fservo_angle = 0;
 		} else {
-			servo_angle = 20;
+			Fservo_angle = 20;
 		}
 
-		if (DualShock_data[1][5]) {
-
+//		サーボモーターの角度指定
+//		〇ボタン
+		if (DualShock_data[1][6]) {
+			Fservo_angle = 0;
+		} else {
+			Fservo_angle = 20;
 		}
+
+//		サーボモーターの角度指定
+//		□ボタン
+//		if (DualShock_data[2][2]) {
+//			Bservo_angle = 0;
+//		} else {
+//			Bservo_angle = 20;
+//		}
+
+//		サーボモーターの角度指定
+//		△ボタン
+//		if (DualShock_data[2][1]) {
+//			Gservo_angle = 0;
+//		} else {
+//			Gservo_angle = 20;
+//		}
+
 //      発射機構正面手動ver(リミットスイッチによる制限付き)
 //		十字キー上ボタン
 		if (DualShock_data[1][2]) {
-//		    前のリミットスイッチ
+//			printf("%d \r\n",FilingMechanism_data[0][1]);
 			if (FilingMechanism_data[0][1]) {
 				s_power = 0;
 				direction = 1;
@@ -229,6 +316,7 @@ int main(void) {
 		}
 //		十字キー下ボタン
 		else if (DualShock_data[1][4]) {
+//			printf("%d \r\n",FilingMechanism_data[0][2]);
 //			後ろのリミットスイッチ
 			if (FilingMechanism_data[0][2]) {
 				s_power = 0;
@@ -244,42 +332,18 @@ int main(void) {
 			direction = 0;
 		}
 
-//		旋回:Y:X方向の出力の計算
-//		Lスティック
-		turning = DualShock_data[2][5] - DualShock_data[2][6];
-		vy = DualShock_data[0][1] - DualShock_data[0][2];
-		vx = DualShock_data[0][3] - DualShock_data[0][4];
-
-//		Y:X方向の値の最低:最大値変更
-		vy = map(vy, -128, 128, -255, 255);
-		vx = map(vx, -128, 128, -255, 255);
-
-//		正面の向きを45度変更
-		new_vx = root * (vx - vy);
-		new_vy = root * (vx + vy);
-
-//		それぞれのオムニの出力の計算
-		fl_power = new_vx + new_vy - turning;
-		fr_power = -new_vx + new_vy + turning;
-		bl_power = new_vx - new_vy + turning;
-		br_power = -new_vx - new_vy - turning;
-
-//		値を弾く
-		fl_power = flip(fl_power);
-		fr_power = flip(fr_power);
-		bl_power = flip(bl_power);
-		br_power = flip(br_power);
-
-//		値からモーターの方向指定
-		fl_state = all_state(fl_power);
-		fr_state = all_state(fr_power);
-		bl_state = all_state(bl_power);
-		br_state = all_state(br_power);
-
-//      can_TX
+//      足回り前
 		CAN_TX(AB_ID, abs(fl_power), fl_state, abs(fr_power), fr_state, 0);
+//      足回り後ろ
 		CAN_TX(CD_ID, abs(bl_power), bl_state, abs(br_power), br_state, 0);
-		CAN_TX(FIRING_ID, 0, 0, s_power, direction, servo_angle);
+//		発射機構前
+		CAN_TX(FFIRING_ID, 0, 0, s_power, direction, Fservo_angle);
+//		発射機構後ろ
+//		CAN_TX(BFIRING_ID, 0, 0, s_power, direction, Bservo_angle);
+//		グライダー
+//		CAN_TX(GFIRING_ID, 0, 0, 0, 0, Gservo_angle);
+
+		HAL_Delay(5);
 	}
 
 //発射機構自動化ver
@@ -614,6 +678,11 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan1) {
 				for (i = 0; i <= 7; i++) {
 					FilingMechanism_data[2][i] = RxData[i];
 				}
+			}
+		}
+		if (id == 0x200) {
+			for (i = 0; i <= 7; i++) {
+				Electrical_data[i] = RxData[i];
 			}
 		}
 	}
