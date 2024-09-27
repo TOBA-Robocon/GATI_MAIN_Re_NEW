@@ -212,9 +212,6 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-
-		printf("main..%d  ", Electrical_data[0]);
-		printf("sub..%d\r\n", Electrical_data[1]);
 //      動作確認用LED
 		HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, RESET);
 		HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, RESET);
@@ -236,10 +233,10 @@ int main(void) {
 		new_vy = root * (-vx + vy);
 
 //		それぞれのオムニの出力の計算
-		fl_power = -new_vx - new_vy - turning;
-		fr_power = new_vx - new_vy + turning;
-		bl_power = -new_vx + new_vy + turning;
-		br_power = new_vx + new_vy - turning;
+//		fl_power = -new_vx - new_vy - turning;
+//		fr_power = new_vx - new_vy + turning;
+//		bl_power = -new_vx + new_vy + turning;
+//		br_power = new_vx + new_vy - turning;
 
 		if (DualShock_data[1][3]) {
 			fl_power = 0;
@@ -252,31 +249,26 @@ int main(void) {
 			bl_power = 250;
 			br_power = 0;
 		} else {
-			fl_power = -new_vx - new_vy - turning;
-			fr_power = new_vx - new_vy + turning;
-			bl_power = -new_vx + new_vy + turning;
-			br_power = new_vx + new_vy - turning;
+			fl_power = -new_vx - new_vy; //- turning;
+			fr_power = new_vx - new_vy; //+ turning;
+			bl_power = -new_vx + new_vy; //+ turning;
+			br_power = new_vx + new_vy; //- turning;
 		}
 
+		turning = tflip(turning);
 //		値を弾く
-		fl_power = flip(fl_power);
-		fr_power = flip(fr_power);
-		bl_power = flip(bl_power);
-		br_power = flip(br_power);
+		fl_power = flip(fl_power) - turning;
+		fr_power = flip(fr_power) + turning;
+		bl_power = flip(bl_power) + turning;
+		br_power = flip(br_power) - turning;
+
+//		printf("turning..%d\r\n", turning);
 
 //		値からモーターの方向指定
 		fl_state = all_state(fl_power);
 		fr_state = all_state(fr_power);
 		bl_state = all_state(bl_power);
 		br_state = all_state(br_power);
-
-//		サーボモーターの角度指定
-//		〇ボタン
-		if (DualShock_data[1][6]) {
-			Fservo_angle = 0;
-		} else {
-			Fservo_angle = 20;
-		}
 
 //		サーボモーターの角度指定
 //		〇ボタン
@@ -330,6 +322,17 @@ int main(void) {
 		else {
 			s_power = 0;
 			direction = 0;
+		}
+//		電源基盤の電圧が低かったらCAN_TXで送る値をすべて0に
+		if (Electrical_data[0] || Electrical_data[1]) {
+			fl_power = 0;
+			fr_power = 0;
+			bl_power = 0;
+			fr_power = 0;
+			s_power = 0;
+			Fservo_angle = 20;
+//			Bservo_angle = 20;
+//			Gservo_angle = 20;
 		}
 
 //      足回り前
@@ -627,6 +630,18 @@ int flip(int flip_num) {
 	return flip_num;
 }
 
+//L2R2の弾く値の設定
+int tflip(int tflip_num) {
+	if (tflip_num <= 10 && -10 <= tflip_num) {
+		tflip_num = 0;
+	} else if (tflip_num <= MIN) {
+		tflip_num = MIN;
+	} else if (tflip_num >= MAX) {
+		tflip_num = MAX;
+	}
+	return tflip_num;
+}
+
 //モーターの方向指定関数
 int all_state(int num) {
 	if (num >= 0) {
@@ -646,6 +661,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan1) {
 	if (HAL_CAN_GetRxMessage(hcan1, CAN_RX_FIFO0, &RxHeader, RxData)
 			== HAL_OK) {
 		id = RxHeader.StdId; // ID
+//		PS4コントローラーの値の取得
 		if (id == 0x000) {
 			HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, SET);
 			if (RxData[0] == 1) {
@@ -662,6 +678,8 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan1) {
 				}
 			}
 		}
+//		ばねハブの値の取得
+//		IDはDIPスイッチで決定
 		if (id == 0x100) {
 			HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, SET);
 			if (RxData[0] == 5) {
@@ -680,6 +698,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan1) {
 				}
 			}
 		}
+//		電源基盤の値の取得
 		if (id == 0x200) {
 			for (i = 0; i <= 7; i++) {
 				Electrical_data[i] = RxData[i];
