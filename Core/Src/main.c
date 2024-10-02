@@ -50,6 +50,7 @@
 #include "stdlib.h"
 #include "stdbool.h"
 #include "syouki.h"
+#include "mpu6050.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -75,6 +76,9 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+
+//MPU6050使うのに必要
+//MPU6050_t MPU6050;
 
 /* USER CODE END PV */
 
@@ -200,10 +204,17 @@ int main(void) {
 	MX_CAN1_Init();
 	MX_I2C1_Init();
 	/* USER CODE BEGIN 2 */
+
 	// CANスタート
 	HAL_CAN_Start(&hcan1);
 	// 割り込み有効
 	HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+
+	//MPU6050キャリブレーション
+//	while (MPU6050_Init(&hi2c1) == 1)
+//		;
+//	MPU6050_Calibration(&hi2c1, &MPU6050, 3000);
+
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -212,6 +223,13 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
+//		MPU6050の値の読み取り
+//		MPU6050_Read_All(&hi2c1, &MPU6050);
+//		printf("offset:%.5f  ", MPU6050.offset_z);
+//		printf("%.5f\r\n", MPU6050.angleZ);
+
+//		あとはMPU6050からとった角度を入れる
+
 //      動作確認用LED
 		HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, RESET);
 		HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, RESET);
@@ -238,31 +256,36 @@ int main(void) {
 //		bl_power = -new_vx + new_vy + turning;
 //		br_power = new_vx + new_vy - turning;
 
+//		十字キー右
 		if (DualShock_data[1][3]) {
 			fl_power = 0;
 			fr_power = 250;
 			bl_power = -250;
 			br_power = 0;
-		} else if (DualShock_data[1][5]) {
+		}
+//		十字キー左
+		else if (DualShock_data[1][5]) {
 			fl_power = 0;
 			fr_power = -250;
 			bl_power = 250;
 			br_power = 0;
-		} else {
+		}
+//		普段
+		else {
 			fl_power = -new_vx - new_vy; //- turning;
 			fr_power = new_vx - new_vy; //+ turning;
 			bl_power = -new_vx + new_vy; //+ turning;
 			br_power = new_vx + new_vy; //- turning;
 		}
 
+//		L2R2の値を弾く
 		turning = tflip(turning);
-//		値を弾く
+
+//		スティックの値を弾く
 		fl_power = flip(fl_power) - turning;
 		fr_power = flip(fr_power) + turning;
 		bl_power = flip(bl_power) + turning;
 		br_power = flip(br_power) - turning;
-
-//		printf("turning..%d\r\n", turning);
 
 //		値からモーターの方向指定
 		fl_state = all_state(fl_power);
@@ -289,9 +312,9 @@ int main(void) {
 //		サーボモーターの角度指定
 //		△ボタン
 //		if (DualShock_data[2][1]) {
-//			Gservo_angle = 0;
-//		} else {
 //			Gservo_angle = 20;
+//		} else {
+//			Gservo_angle = 0;
 //		}
 
 //      発射機構正面手動ver(リミットスイッチによる制限付き)
@@ -332,7 +355,7 @@ int main(void) {
 			s_power = 0;
 			Fservo_angle = 20;
 //			Bservo_angle = 20;
-//			Gservo_angle = 20;
+//			Gservo_angle = 0;
 		}
 
 //      足回り前
@@ -340,7 +363,7 @@ int main(void) {
 //      足回り後ろ
 		CAN_TX(CD_ID, abs(bl_power), bl_state, abs(br_power), br_state, 0);
 //		発射機構前
-		CAN_TX(FFIRING_ID, 0, 0, s_power, direction, Fservo_angle);
+		CAN_TX(FFIRING_ID, s_power, direction, 0, 0, Fservo_angle);
 //		発射機構後ろ
 //		CAN_TX(BFIRING_ID, 0, 0, s_power, direction, Bservo_angle);
 //		グライダー
