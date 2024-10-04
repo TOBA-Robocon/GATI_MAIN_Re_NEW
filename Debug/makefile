@@ -61,7 +61,7 @@ main-build: GATI_MAIN_Re_NEW.elf secondary-outputs
 
 # Tool invocations
 GATI_MAIN_Re_NEW.elf GATI_MAIN_Re_NEW.map: $(OBJS) $(USER_OBJS) C:\Users\takut\STM32CubeIDE\workspace_1.16.0\GATI_MAIN_Re_NEW\STM32L433RCTXP_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "GATI_MAIN_Re_NEW.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\takut\STM32CubeIDE\workspace_1.16.0\GATI_MAIN_Re_NEW\STM32L433RCTXP_FLASH.ld" --specs=nosys.specs -Wl,-Map="GATI_MAIN_Re_NEW.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "GATI_MAIN_Re_NEW.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\takut\STM32CubeIDE\workspace_1.16.0\GATI_MAIN_Re_NEW\STM32L433RCTXP_FLASH.ld" --specs=nosys.specs -Wl,-Map="GATI_MAIN_Re_NEW.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

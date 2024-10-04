@@ -79,7 +79,6 @@ UART_HandleTypeDef huart2;
 
 //MPU6050使うのに必要
 //MPU6050_t MPU6050;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -105,7 +104,7 @@ static void MX_I2C1_Init(void);
 //#define BFIRING_ID 0x006
 
 //グライダー
-//#define GFIRING_ID 0x007
+#define GFIRING_ID 0x004
 
 //receive_ID
 uint32_t fId1 = 0x000 << 5; // フィルターID1
@@ -150,6 +149,9 @@ int Fservo_angle = 0;
 
 //後ろのサーボの角度指定
 //int Bservo_angle = 0;
+
+//後ろのサーボの角度指定
+int Gservo_angle = 0;
 
 //PS4からのデータ受け取り用配列
 uint8_t DualShock_data[3][8] = { 0 };
@@ -227,9 +229,7 @@ int main(void) {
 //		MPU6050_Read_All(&hi2c1, &MPU6050);
 //		printf("offset:%.5f  ", MPU6050.offset_z);
 //		printf("%.5f\r\n", MPU6050.angleZ);
-
 //		あとはMPU6050からとった角度を入れる
-
 //      動作確認用LED
 		HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, RESET);
 		HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, RESET);
@@ -311,11 +311,11 @@ int main(void) {
 
 //		サーボモーターの角度指定
 //		△ボタン
-//		if (DualShock_data[2][1]) {
-//			Gservo_angle = 20;
-//		} else {
-//			Gservo_angle = 0;
-//		}
+		if (DualShock_data[2][1]) {
+			Gservo_angle = 10;
+		} else {
+			Gservo_angle = 0;
+		}
 
 //      発射機構正面手動ver(リミットスイッチによる制限付き)
 //		十字キー上ボタン
@@ -361,7 +361,7 @@ int main(void) {
 //      足回り前
 		CAN_TX(AB_ID, abs(fl_power), fl_state, abs(fr_power), fr_state, 0);
 //      足回り後ろ
-		CAN_TX(CD_ID, abs(bl_power), bl_state, abs(br_power), br_state, 0);
+		CAN_TX(CD_ID, abs(bl_power), bl_state, abs(br_power), br_state, Gservo_angle);
 //		発射機構前
 		CAN_TX(FFIRING_ID, s_power, direction, 0, 0, Fservo_angle);
 //		発射機構後ろ
@@ -731,8 +731,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan1) {
 }
 
 //can_TX
-void CAN_TX(int stm_id, int m1, int direction1, int m2, int direction2,
-		int servo_angle) {
+void CAN_TX(uint8_t stm_id, int m1, int direction1, int m2, int direction2, int servo_angle) {
 	HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, SET);
 	CAN_TxHeaderTypeDef TxHeader;
 	uint32_t TxMailbox;
